@@ -1,0 +1,116 @@
+[project]
+name = "tehillim-cluster"
+version = "0.1.0"
+description = "Computes similarity between the Psalms from ETCBC/BHSA data via Text-Fabric."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = [
+    "numpy>=1.26",
+    "pyarrow>=17.0",
+    "scikit-learn>=1.4",
+    "scipy>=1.11",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.10",
+    "deptry>=0.16",
+    "vulture>=2.11",
+]
+
+[tool.deptry]
+known_first_party = ["tehillim_cluster"]
+
+[tool.deptry.per_rule_ignores]
+# Tools CI invokes, so none of them is ever imported by this package.
+DEP002 = ["pytest", "ruff", "mypy", "deptry", "vulture"]
+
+[project.scripts]
+tehillim-cluster = "tehillim_cluster.cli:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+tehillim = ["py.typed"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# Everything ruff implements, minus the families below, each excluded for a stated reason.
+# Matches tehillim-embeddings and tehillim-benchmark so one convention covers all three.
+select = ["ALL"]
+ignore = [
+    # The one-line docstring convention these repos use conflicts with pydocstyle's
+    # multi-line summary, blank-line, and imperative-mood rules.
+    "D203", "D205", "D212", "D400", "D401", "D415",
+    # Positional booleans are readable in the signatures that use them.
+    "FBT001", "FBT002",
+    # Copyright headers are not used in these repos.
+    "CPY001",
+    # assert is how pytest expresses expectations.
+    "S101",
+    # Comment formatting: the `#:` prefix marks provenance notes throughout.
+    "E265",
+    # Conflicts with the formatter, which owns trailing commas.
+    "COM812",
+    # Heavy optional imports are deliberately deferred into functions.
+    "PLC0415",
+    # Detailed, self-contained error messages are preferred over terse ones.
+    "TRY003", "EM101", "EM102",
+    # Moving runtime-needed names into TYPE_CHECKING breaks dataclass field resolution.
+    "TC001", "TC002", "TC003",
+    # The small integers flagged are cluster counts and n-gram orders, named by their context.
+    "PLR2004",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pylint]
+max-args = 8
+
+[tool.ruff.lint.per-file-ignores]
+# A vulture whitelist is by format a list of bare attribute expressions.
+".vulture-whitelist.py" = ["B018"]
+# The CLI's stdout is its interface.
+"src/tehillim_cluster/cli.py" = ["T201"]
+# Text-Fabric names its features at runtime, so Any is the accurate annotation here.
+"src/tehillim_cluster/corpus.py" = ["ANN401"]
+# Test names and bodies are the documentation; annotating every fixture adds noise, not signal.
+"tests/**" = ["ANN", "D10", "PLR2004", "S", "SLF001", "ARG", "INP001", "PLR0913", "PLR0917"]
+
+[tool.mypy]
+# Kept >= the numpy stubs' minimum (they use PEP 695 syntax). Our code
+# Matches requires-python's floor and the CI interpreter.
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--cov=src", "--cov-report=term-missing", "--cov-fail-under=90"]
+# A numpy or scipy warning means a statistic silently degenerated, so it fails the build.
+filterwarnings = ["error"]
+markers = [
+    "integration: requires BHSA/valence locally (see TEHILLIM_BHSA_PATH) or via Text-Fabric's use()",
+    "api_integration: makes one real call to a paid embedding API via OpenRouter, requires TEHILLIM_OPENROUTER_API_KEY (skipped automatically when unset)",
+]
+
+[tool.coverage.run]
+source = ["src"]
+
+[tool.coverage.report]
+#: main() is CLI wiring under test like any other code, so only unreachable lines are excluded.
+exclude_also = [
+    "^if __name__ == .__main__.:$",
+]
